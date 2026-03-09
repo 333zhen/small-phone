@@ -58,9 +58,10 @@
         .scroll-area { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 80px; }
         .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
         .form-group label { font-size: 14px; color: #ff758c; font-weight: bold; }
-        .form-group input, .form-group textarea { padding: 12px; border: 1px solid #ffc0cb; border-radius: 12px; font-size: 14px; color: #555; background: rgba(255,255,255,0.8); outline: none; font-family: inherit; }
+        .form-group input, .form-group textarea, .form-group select { padding: 12px; border: 1px solid #ffc0cb; border-radius: 12px; font-size: 14px; color: #555; background: rgba(255,255,255,0.8); outline: none; font-family: inherit; }
         .form-group textarea { height: 80px; resize: none; }
         .btn-primary { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: white; border: none; padding: 12px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 3px 8px rgba(255, 154, 158, 0.4); margin-bottom: 10px; }
+        .btn-secondary { background: white; color: #ff758c; border: 1px solid #ff758c; padding: 10px; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; }
         .btn-cancel { background: #f0f2f5; color: #999; border: none; padding: 12px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; display: none; }
         .card { background: white; border: 1px solid #ffe4e1; border-radius: 15px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2); cursor: pointer; transition: 0.2s; }
         .card.active { border: 2px solid #ff758c; background: #fff0f5; }
@@ -167,10 +168,19 @@
             <div id="adminApiSettings" style="display: none;">
                 <hr style="border: 0; border-top: 1px dashed #ffb6c1; margin: 20px 0;">
                 <div style="color: #ff758c; font-weight: bold; margin-bottom: 10px;">🔧 系統與 API 設定 (僅管理員可見)</div>
-                <div style="font-size: 12px; color: #999; margin-bottom: 10px;">注意：填寫在這裡的 API Key 只會保存在「這台手機」裡，不會分享給朋友喔！如果想讓朋友免填 Key，還是得寫在程式碼裡。</div>
+                <div style="font-size: 12px; color: #999; margin-bottom: 10px;">注意：填寫在這裡的 API Key 只會保存在「這台手機」裡。如果想讓朋友免填 Key，還是得寫在程式碼裡。</div>
                 <div class="form-group"><label>🌐 請求地址</label><input type="text" id="apiUrl" placeholder="預設: https://openrouter.ai/api/v1/chat/completions"></div>
-                <div class="form-group"><label>🔑 API Key</label><input type="password" id="apiKey" placeholder="在此貼上你的 API Key"></div>
-                <div class="form-group"><label>🤖 模型代號</label><input type="text" id="apiModel" placeholder="預設: google/gemini-2.5-pro"></div>
+                <div class="form-group">
+                    <label>🔑 API Key</label>
+                    <input type="password" id="apiKey" placeholder="在此貼上你的 API Key">
+                    <button class="btn-secondary" style="margin-top: 8px;" onclick="fetchModels()">🔄 自動拉取模型</button>
+                </div>
+                <div class="form-group">
+                    <label>🤖 選擇 AI 模型</label>
+                    <select id="modelSelect">
+                        <option value="google/gemini-2.5-pro">預設：google/gemini-2.5-pro</option>
+                    </select>
+                </div>
                 <button class="btn-primary" onclick="saveAdminSettings()">💾 儲存系統設定</button>
             </div>
         </div>
@@ -204,7 +214,7 @@
     const ADMIN_PASSCODE = "admin123";  
     const USER_PASSCODE = "baby123";    
     
-    // 如果你在畫面上沒有填 Key，系統就會自動吃這裡的預設 Key，這樣閨蜜就可以直接玩！
+    // 如果你在畫面上沒有填 Key，系統就會自動吃這裡的預設 Key
     const HIDDEN_API_KEY = "請把你的_API_KEY_貼在這裡"; 
     const HIDDEN_API_URL = "https://openrouter.ai/api/v1/chat/completions";
     const HIDDEN_MODEL = "google/gemini-2.5-pro"; 
@@ -233,10 +243,14 @@
     let tempImages = { tempCharImg: "", tempPersonaImg: "" };
 
     window.onload = function() {
-        // 載入管理員設定 (如果有)
+        // 載入管理員設定
         document.getElementById('apiUrl').value = localStorage.getItem('myApiUrl') || HIDDEN_API_URL;
         document.getElementById('apiKey').value = localStorage.getItem('myApiKey') || ''; 
-        document.getElementById('apiModel').value = localStorage.getItem('myApiModel') || HIDDEN_MODEL;
+        
+        // 載入儲存的模型列表與選擇的模型
+        const savedModels = JSON.parse(localStorage.getItem('cachedModels')) || [];
+        const savedSelectedModel = localStorage.getItem('mySelectedModel') || HIDDEN_MODEL;
+        populateModelSelect(savedModels, savedSelectedModel);
 
         renderCharacterList();
         renderPersonaList();
@@ -253,25 +267,60 @@
 
     function enterApp(isAdmin) {
         document.getElementById('view-login').style.display = 'none';
-        
-        // 根據身分顯示/隱藏功能
-        if(isAdmin) {
-            document.getElementById('nav-create').style.display = 'flex';
-            document.getElementById('adminApiSettings').style.display = 'block';
-        } else {
-            document.getElementById('nav-create').style.display = 'none';
-            document.getElementById('adminApiSettings').style.display = 'none';
-        }
+        if(isAdmin) { document.getElementById('nav-create').style.display = 'flex'; document.getElementById('adminApiSettings').style.display = 'block'; } 
+        else { document.getElementById('nav-create').style.display = 'none'; document.getElementById('adminApiSettings').style.display = 'none'; }
+        document.getElementById('mainNav').style.display = 'flex'; switchTab('sessions');
+    }
 
-        document.getElementById('mainNav').style.display = 'flex';
-        switchTab('sessions');
+    // --- 【全新魔法】一鍵拉取 API 模型列表 ---
+    async function fetchModels() {
+        let apiUrl = document.getElementById('apiUrl').value.trim() || HIDDEN_API_URL;
+        const apiKey = document.getElementById('apiKey').value.trim() || HIDDEN_API_KEY;
+        const selectElement = document.getElementById('modelSelect');
+
+        if (!apiKey || apiKey.includes("在這裡填寫")) { alert("請先在上面貼上 API Key 喔！"); return; }
+
+        let modelsUrl = apiUrl;
+        if (modelsUrl.includes('/chat/completions')) modelsUrl = modelsUrl.replace('/chat/completions', '/models');
+        else if (!modelsUrl.endsWith('/models')) modelsUrl = modelsUrl.replace(/\/$/, '') + '/models';
+
+        selectElement.innerHTML = '<option>🔄 連線中...請稍候</option>';
+
+        try {
+            const response = await fetch(modelsUrl, { method: "GET", headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" } });
+            if (!response.ok) throw new Error("連線遭拒，請確認網址和 Key 是否正確！");
+            const data = await response.json();
+            let modelsList = data.data || []; 
+
+            if (modelsList.length === 0) {
+                selectElement.innerHTML = `<option value="${HIDDEN_MODEL}">無法獲取列表，保留預設模型</option>`;
+                alert("連線成功但找不到模型，請確認服務商設定。"); return;
+            }
+
+            localStorage.setItem('cachedModels', JSON.stringify(modelsList));
+            populateModelSelect(modelsList, modelsList[0].id);
+            alert(`🎉 連線成功！已為你自動抓取 ${modelsList.length} 個最新模型！`);
+        } catch (error) {
+            selectElement.innerHTML = `<option value="${HIDDEN_MODEL}">拉取失敗，使用預設</option>`;
+            alert("拉取失敗：" + error.message);
+        }
+    }
+
+    function populateModelSelect(modelsList, selectedId) {
+        const selectElement = document.getElementById('modelSelect');
+        if (modelsList.length === 0) return;
+        selectElement.innerHTML = '';
+        modelsList.forEach(m => {
+            const opt = document.createElement('option'); opt.value = m.id; opt.innerText = m.name || m.id;
+            if (m.id === selectedId) opt.selected = true; selectElement.appendChild(opt);
+        });
     }
 
     // --- 儲存管理員 API 設定 ---
     function saveAdminSettings() {
         localStorage.setItem('myApiUrl', document.getElementById('apiUrl').value.trim());
         localStorage.setItem('myApiKey', document.getElementById('apiKey').value.trim());
-        localStorage.setItem('myApiModel', document.getElementById('apiModel').value.trim());
+        localStorage.setItem('mySelectedModel', document.getElementById('modelSelect').value);
         alert('系統設定已儲存！\n(⚠️ 注意：這只會存在這台手機，如果你要分享給別人玩，請把 Key 寫進 GitHub 代碼裡喔)');
     }
 
@@ -280,10 +329,8 @@
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
         document.getElementById(`view-${tabName}`).classList.add('active');
-        const navBtn = document.getElementById(`nav-${tabName}`);
-        if(navBtn) navBtn.classList.add('active');
-        if(['sessions', 'chars', 'create', 'settings'].includes(tabName)) document.getElementById('mainNav').style.display = 'flex';
-        else document.getElementById('mainNav').style.display = 'none';
+        const navBtn = document.getElementById(`nav-${tabName}`); if(navBtn) navBtn.classList.add('active');
+        if(['sessions', 'chars', 'create', 'settings'].includes(tabName)) document.getElementById('mainNav').style.display = 'flex'; else document.getElementById('mainNav').style.display = 'none';
         if(tabName === 'sessions') renderSessionList();
         if(tabName !== 'create' && editingCharId) cancelEditChar();
     }
@@ -296,11 +343,9 @@
         if(!activeSessionId) return; const session = chatSessions.find(s => s.id === activeSessionId); const char = characters.find(c => c.id === session.charId); if(!char) return;
         const bigAvatar = document.getElementById('callBigAvatar');
         if (char.avatar.startsWith('data:image')) { bigAvatar.style.backgroundImage = `url(${char.avatar})`; bigAvatar.innerText = ''; } else { bigAvatar.style.backgroundImage = 'none'; bigAvatar.innerText = char.avatar || '✨'; }
-        document.getElementById('callCharName').innerText = char.name;
-        let lastAiMsg = "（安靜的呼吸聲...）";
+        document.getElementById('callCharName').innerText = char.name; let lastAiMsg = "（安靜的呼吸聲...）";
         for (let i = messageHistory.length - 1; i >= 0; i--) { if (messageHistory[i].role === 'assistant') { lastAiMsg = messageHistory[i].content; break; } }
-        document.getElementById('callSubtitle').innerText = lastAiMsg; document.getElementById('callInput').value = '';
-        callSeconds = 0; document.getElementById('callTimer').innerText = `00:00 通話中...`; clearInterval(callTimerInterval);
+        document.getElementById('callSubtitle').innerText = lastAiMsg; document.getElementById('callInput').value = ''; callSeconds = 0; document.getElementById('callTimer').innerText = `00:00 通話中...`; clearInterval(callTimerInterval);
         callTimerInterval = setInterval(() => { callSeconds++; let m = Math.floor(callSeconds / 60).toString().padStart(2, '0'); let s = (callSeconds % 60).toString().padStart(2, '0'); document.getElementById('callTimer').innerText = `${m}:${s} 通話中...`; }, 1000); switchTab('call');
     }
     function endCall() { clearInterval(callTimerInterval); switchTab('chat'); setTimeout(() => document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight, 100); }
@@ -399,10 +444,9 @@
         if (!activeSessionId) return;
         const session = chatSessions.find(s => s.id === activeSessionId); const char = characters.find(c => c.id === session.charId); const persona = personas.find(p => p.id === session.personaId);
         
-        // 優先讀取你在畫面上填的 API Key，如果沒填，就讀取程式碼裡隱藏的 API Key！
         const apiUrl = localStorage.getItem('myApiUrl') || HIDDEN_API_URL;
         const apiKey = localStorage.getItem('myApiKey') || HIDDEN_API_KEY;
-        const selectedModel = localStorage.getItem('myApiModel') || HIDDEN_MODEL;
+        const selectedModel = localStorage.getItem('mySelectedModel') || HIDDEN_MODEL;
 
         const inputId = source === 'chat' ? 'chatInput' : 'callInput'; const inputEl = document.getElementById(inputId); const text = inputEl.value.trim();
         if (!apiKey || apiKey.includes("在這裡填寫")) { alert("尚未設定 API Key！請用 admin123 登入後去設定，或在程式碼中填寫！"); return; }
@@ -439,3 +483,4 @@
 
 </body>
 </html>
+
