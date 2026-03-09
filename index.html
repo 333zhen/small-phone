@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我的專屬戀人</title>
+    <style>
+        /* 基礎設定與漸層背景 */
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .phone-wrapper { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: #fffafa; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(255, 182, 193, 0.3); position: relative; }
+
+        /* 視圖切換 */
+        .view { display: none; flex-direction: column; height: 100%; overflow: hidden; background: #fffafa; }
+        .view.active { display: flex; }
+
+        /* --- 共用標題列 --- */
+        .top-bar { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 15px 20px; text-align: center; font-weight: bold; color: #ff758c; border-bottom: 1px solid #ffe4e1; box-shadow: 0 2px 10px rgba(255, 192, 203, 0.15); z-index: 10; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
+        .back-btn { color: #ff758c; font-size: 16px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        
+        /* --- 聊天室專區 (含雙方大頭貼) --- */
+        .chat-header-info { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 45px; height: 45px; background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; box-shadow: 0 2px 5px rgba(255, 154, 158, 0.5); background-size: cover; background-position: center; flex-shrink: 0; }
+        .msg-avatar { width: 35px; height: 35px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; display: flex; justify-content: center; align-items: center; font-size: 18px; background-color: #ffe4e1; }
+        .char-info { display: flex; flex-direction: column; text-align: left;}
+        .char-name { font-weight: bold; font-size: 16px; color: #ff758c; }
+
+        .chat-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background-image: radial-gradient(#ffc0cb 0.5px, transparent 0.5px); background-size: 20px 20px; padding-bottom: 80px; }
+        
+        .message-row { display: flex; gap: 10px; align-items: flex-end; width: 100%; margin-bottom: 5px; }
+        .message-row.user { flex-direction: row-reverse; }
+        .message { max-width: 65%; padding: 12px 16px; line-height: 1.5; word-wrap: break-word; font-size: 15px; box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2); white-space: pre-wrap; }
+        .user-msg { background: linear-gradient(to right, #ff9a9e, #fecfef); color: white; border-radius: 20px 20px 5px 20px; }
+        .ai-msg { background: white; color: #666; border-radius: 20px 20px 20px 5px; border: 1px solid #fff0f5; }
+
+        /* 底部輸入區 */
+        .input-area { background: white; padding: 12px 15px; display: flex; gap: 10px; border-top: 1px solid #ffe4e1; align-items: flex-end; position: absolute; bottom: 0; width: 100%; box-sizing: border-box; z-index: 30; }
+        .input-area textarea { flex: 1; padding: 12px 18px; border: 1px solid #ffb6c1; border-radius: 20px; font-size: 15px; outline: none; background: #fffafa; color: #555; resize: none; min-height: 20px; max-height: 100px; font-family: inherit; line-height: 1.4; }
+        .input-area button { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: white; border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center; box-shadow: 0 3px 8px rgba(255, 154, 158, 0.4); flex-shrink: 0; margin-bottom: 2px; }
+
+        /* --- 列表與設定專區 --- */
+        .scroll-area { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 80px; }
+        .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        .form-group label { font-size: 14px; color: #ff758c; font-weight: bold; }
+        .form-group input, .form-group textarea, .form-group select { padding: 12px; border: 1px solid #ffc0cb; border-radius: 12px; font-size: 14px; color: #555; background: rgba(255,255,255,0.8); outline: none; font-family: inherit; }
+        .form-group textarea { height: 80px; resize: none; }
+        .btn-primary { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: white; border: none; padding: 12px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 3px 8px rgba(255, 154, 158, 0.4); margin-bottom: 10px; }
+        .btn-secondary { background: white; color: #ff758c; border: 1px solid #ff758c; padding: 10px; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; }
+        
+        /* 卡片設計 */
+        .card { background: white; border: 1px solid #ffe4e1; border-radius: 15px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2); cursor: pointer; transition: 0.2s; }
+        .card.active { border: 2px solid #ff758c; background: #fff0f5; }
+        .card-content { display: flex; align-items: center; gap: 15px; flex: 1; overflow: hidden; }
+        .desc-text { font-size: 12px; color: #999; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: normal; }
+        .delete-btn { color: #ffb7b2; font-size: 20px; padding: 5px; cursor: pointer; }
+        .delete-btn:hover { color: #ff4d4d; }
+
+        /* 上傳按鈕特化 */
+        .upload-btn { background: white; border: 1px dashed #ff9a9e; color: #ff758c; padding: 12px; border-radius: 12px; text-align: center; cursor: pointer; font-size: 14px; display: block; }
+        input[type="file"] { display: none; }
+        .previewBox { width: 60px; height: 60px; border-radius: 50%; margin: 10px auto 0; background-size: cover; background-position: center; border: 2px solid #ffc0cb; display: none; justify-content: center; align-items: center; font-size: 24px; }
+
+        /* --- 底部導覽列 --- */
+        .bottom-nav { position: absolute; bottom: 0; width: 100%; height: 60px; background: white; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #ffe4e1; box-shadow: 0 -2px 10px rgba(255, 192, 203, 0.1); z-index: 20; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: #ffb7b2; font-size: 12px; cursor: pointer; gap: 4px; flex: 1; padding: 10px 0; transition: 0.2s; }
+        .nav-item.active { color: #ff758c; font-weight: bold; transform: translateY(-2px); }
+        .nav-icon { font-size: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="phone-wrapper">
+
+    <div id="view-sessions" class="view active">
+        <div class="top-bar" style="justify-content: center;">💬 訊息列表</div>
+        <div class="scroll-area" id="sessionList">
+            </div>
+    </div>
+
+    <div id="view-chat" class="view">
+        <div class="top-bar">
+            <div class="back-btn" onclick="switchTab('sessions')">‹ 返回</div>
+            <div class="chat-header-info">
+                <div class="char-name" id="chatHeaderName">角色名字</div>
+            </div>
+            <div class="delete-btn" onclick="deleteCurrentSession()" title="刪除此對話">🗑️</div>
+        </div>
+        <div class="chat-container" id="chatBox" onclick="document.getElementById('userInput').blur()"></div>
+        <div class="input-area">
+            <textarea id="userInput" placeholder="輸入訊息... (手機直接按換行)" rows="1" oninput="autoResize(this)" onkeydown="handleEnter(event)"></textarea>
+            <button onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <div id="view-chars" class="view">
+        <div class="top-bar" style="justify-content: center;">👥 專屬聯絡人</div>
+        <div class="scroll-area">
+            <div style="color: #ff758c; font-weight: bold; margin-bottom: 10px; font-size: 14px;">點擊角色開啟新聊天室 👇</div>
+            <div id="charList"></div>
+        </div>
+    </div>
+
+    <div id="view-create" class="view">
+        <div class="top-bar" style="justify-content: center;">✨ 創造新角色</div>
+        <div class="scroll-area">
+            <div class="form-group">
+                <label>角色名稱</label>
+                <input type="text" id="newCharName" placeholder="例如：傲嬌總裁、呆萌學妹">
+            </div>
+            <div class="form-group">
+                <label class="upload-btn">📸 上傳角色頭貼 (選填) <input type="file" accept="image/*" onchange="processImage(event, 'previewCharAvatar', 'tempCharImg')"></label>
+                <div id="previewCharAvatar" class="previewBox"></div>
+            </div>
+            <div class="form-group">
+                <label>💬 開場白 (見面第一句話)</label>
+                <textarea id="newCharGreeting" placeholder="例如：寶寶，今天怎麼這麼晚才找我？"></textarea>
+            </div>
+            <div class="form-group">
+                <label>📝 角色設定 (Prompt)</label>
+                <textarea id="newCharPrompt" placeholder="詳細描述他的個性、說話方式..."></textarea>
+            </div>
+            <button class="btn-primary" onclick="addCharacter()">＋ 完成並建立角色</button>
+        </div>
+    </div>
+
+    <div id="view-settings" class="view">
+        <div class="top-bar" style="justify-content: center;">⚙️ 軟體與主控設定</div>
+        <div class="scroll-area">
+            
+            <div style="color: #ff758c; font-weight: bold; margin-bottom: 10px;">🎭 我的主控切換 (Persona)</div>
+            <div style="font-size: 12px; color: #999; margin-bottom: 10px;">切換主控後，新開的聊天室就會套用這個身分喔！</div>
+            <div id="personaList"></div>
+            
+            <div style="background: rgba(255,182,193,0.1); padding: 15px; border-radius: 15px; margin-bottom: 25px;">
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <input type="text" id="newPersonaName" placeholder="新增主控名稱 (例：綠茶學妹)">
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label class="upload-btn" style="border-color:#ff758c;">📸 上傳我的頭貼 <input type="file" accept="image/*" onchange="processImage(event, 'previewPersonaAvatar', 'tempPersonaImg')"></label>
+                    <div id="previewPersonaAvatar" class="previewBox"></div>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <textarea id="newPersonaPrompt" placeholder="描述「我」是誰，例如：我叫小雅，是一個很愛撒嬌的女大學生..."></textarea>
+                </div>
+                <button class="btn-primary" style="padding: 8px; font-size: 14px;" onclick="addPersona()">＋ 建立新主控</button>
+            </div>
+
+            <hr style="border: 0; border-top: 1px dashed #ffb6c1; margin: 20px 0;">
+
+            <div style="color: #ff758c; font-weight: bold; margin-bottom: 10px;">🔧 API 連線設定</div>
+            <div class="form-group">
+                <label>🌐 請求地址 (Base URL)</label>
+                <input type="text" id="apiUrl" placeholder="預設: https://openrouter.ai/api/v1/chat/completions">
+            </div>
+            <div class="form-group">
+                <label>🔑 API Key</label>
+                <input type="password" id="apiKey" placeholder="在此貼上你的 API Key">
+                <button class="btn-secondary" style="margin-top: 8px;" onclick="fetchModels()">🔄 自動拉取模型</button>
+            </div>
+            <div class="form-group">
+                <select id="modelSelect">
+                    <option value="google/gemini-2.5-pro">預設：google/gemini-2.5-pro</option>
+                </select>
+            </div>
+            <button class="btn-primary" onclick="saveSettings()">💾 儲存系統設定</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav" id="mainNav">
+        <div class="nav-item active" id="nav-sessions" onclick="switchTab('sessions')"><div class="nav-icon">💬</div><div>訊息</div></div>
+        <div class="nav-item" id="nav-chars" onclick="switchTab('chars')"><div class="nav-icon">👥</div><div>聯絡人</div></div>
+        <div class="nav-item" id="nav-create" onclick="switchTab('create')"><div class="nav-icon">➕</div><div>新增</div></div>
+        <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><div>設定</div></div>
+    </div>
+
+</div>
+
+<script>
+    // --- 資料庫初始化 ---
+    let characters = JSON.parse(localStorage.getItem('myCharacters')) || [];
+    let personas = JSON.parse(localStorage.getItem('myPersonas')) || [{id: 'default', name: '預設主控', avatar: '🎭', prompt: '沒有特殊設定的普通人'}];
+    let chatSessions = JSON.parse(localStorage.getItem('myChatSessions')) || [];
+    
+    let activePersonaId = localStorage.getItem('activePersonaId') || 'default';
+    let activeSessionId = null; 
+    let messageHistory = []; 
+
+    let tempImages = { tempCharImg: "", tempPersonaImg: "" };
+    const DEFAULT_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+    window.onload = function() {
+        document.getElementById('apiUrl').value = localStorage.getItem('myApiUrl') || DEFAULT_API_URL;
+        document.getElementById('apiKey').value = localStorage.getItem('myApiKey') || '';
+        
+        const savedModels = JSON.parse(localStorage.getItem('cachedModels')) || [];
+        const savedSelectedModel = localStorage.getItem('mySelectedModel') || "google/gemini-2.5-pro";
+        populateModelSelect(savedModels, savedSelectedModel);
+
+        renderCharacterList();
+        renderPersonaList();
+        renderSessionList();
+    }
+
+    // --- 全新統一的 UI 切換邏輯 ---
+    function switchTab(tabName) {
+        // 隱藏所有畫面
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        // 移除所有導覽按鈕的高亮
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        
+        // 顯示選中的畫面
+        document.getElementById(`view-${tabName}`).classList.add('active');
+        
+        // 點亮對應的導覽按鈕 (聊天室沒有對應的導覽按鈕，所以要防呆)
+        const navBtn = document.getElementById(`nav-${tabName}`);
+        if(navBtn) navBtn.classList.add('active');
+        
+        // 如果進入聊天室，隱藏底部導覽列；否則顯示
+        document.getElementById('mainNav').style.display = (tabName === 'chat') ? 'none' : 'flex';
+        
+        if(tabName === 'sessions') renderSessionList();
+    }
+
+    function autoResize(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+    }
+
+    function handleEnter(event) {
+        if (event.shiftKey) return;
+        if (event.key === 'Enter') {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (!isMobile) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+    }
+
+    // --- 圖片處理 ---
+    function processImage(event, previewId, tempVarName) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > h) { if (w > 150) { h *= 150 / w; w = 150; } } else { if (h > 150) { w *= 150 / h; h = 150; } }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                tempImages[tempVarName] = canvas.toDataURL('image/jpeg', 0.8);
+                const box = document.getElementById(previewId);
+                box.style.backgroundImage = `url(${tempImages[tempVarName]})`;
+                box.style.display = 'flex';
+                box.innerText = '';
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function getAvatarHtml(avatarData) {
+        if (!avatarData) return `<div class="avatar">✨</div>`;
+        if (avatarData.startsWith('data:image')) return `<div class="avatar" style="background-image: url(${avatarData}); background-color: transparent;"></div>`;
+        return `<div class="avatar">${avatarData}</div>`;
+    }
+
+    // --- 主控 (Persona) 邏輯 ---
+    function renderPersonaList() {
+        const listDiv = document.getElementById('personaList');
+        listDiv.innerHTML = '';
+        personas.forEach(p => {
+            const isActive = p.id === activePersonaId ? 'active' : '';
+            const card = document.createElement('div');
+            card.className = `card ${isActive}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'card-content';
+            contentDiv.onclick = () => {
+                activePersonaId = p.id;
+                localStorage.setItem('activePersonaId', p.id);
+                renderPersonaList();
+            };
+            contentDiv.innerHTML = `${getAvatarHtml(p.avatar)}<div style="flex:1; overflow:hidden;"><div style="font-weight:bold; color:#555;">${p.name} ${isActive ? '✅(使用中)' : ''}</div><div class="desc-text">${p.prompt || '無額外設定'}</div></div>`;
+            card.appendChild(contentDiv);
+
+            if (p.id !== 'default') {
+                const delBtn = document.createElement('div');
+                delBtn.className = 'delete-btn';
+                delBtn.innerHTML = '🗑️';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if(confirm("確定刪除此主控？")) {
+                        personas = personas.filter(x => x.id !== p.id);
+                        localStorage.setItem('myPersonas', JSON.stringify(personas));
+                        if(activePersonaId === p.id) activePersonaId = 'default';
+                        renderPersonaList();
+                    }
+                };
+                card.appendChild(delBtn);
+            }
+            listDiv.appendChild(card);
+        });
+    }
+
+    function addPersona() {
+        const name = document.getElementById('newPersonaName').value.trim();
+        const prompt = document.getElementById('newPersonaPrompt').value.trim();
+        const avatarData = tempImages.tempPersonaImg || '🎭'; 
+
+        if(!name) { alert('寶寶，主控名稱必填喔！'); return; }
+
+        const newP = { id: 'p_' + Date.now().toString(), name, avatar: avatarData, prompt };
+        personas.push(newP);
+        localStorage.setItem('myPersonas', JSON.stringify(personas));
+        
+        document.getElementById('newPersonaName').value = '';
+        document.getElementById('newPersonaPrompt').value = '';
+        document.getElementById('previewPersonaAvatar').style.display = 'none';
+        tempImages.tempPersonaImg = "";
+        
+        activePersonaId = newP.id;
+        localStorage.setItem('activePersonaId', newP.id);
+        renderPersonaList();
+        alert('新主控建立成功！已為你切換。');
+    }
+
+    // --- 角色 (Character) 邏輯 ---
+    function renderCharacterList() {
+        const listDiv = document.getElementById('charList');
+        listDiv.innerHTML = '';
+        if(characters.length === 0) { listDiv.innerHTML = '<div style="text-align:center; color:#ffb7b2; font-size:14px; padding-top: 20px;">通訊錄空空的...<br>點擊下方「➕ 新增」去建立角色吧！</div>'; return; }
+
+        characters.forEach(char => {
+            const card = document.createElement('div');
+            card.className = `card`;
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'card-content';
+            contentDiv.onclick = () => createNewSession(char.id); 
+            contentDiv.innerHTML = `${getAvatarHtml(char.avatar)}<div style="flex:1; overflow:hidden;"><div style="font-weight:bold; color:#ff758c;">${char.name}</div><div class="desc-text">點擊創建新聊天室</div></div>`;
+            card.appendChild(contentDiv);
+
+            const delBtn = document.createElement('div');
+            delBtn.className = 'delete-btn';
+            delBtn.innerHTML = '🗑️';
+            delBtn.onclick = (e) => {
+                e.stopPropagation();
+                if(confirm("確定刪除角色？這不會刪除你們過去的聊天室喔。")) {
+                    characters = characters.filter(c => c.id !== char.id);
+                    localStorage.setItem('myCharacters', JSON.stringify(characters));
+                    renderCharacterList();
+                }
+            };
+            card.appendChild(delBtn);
+            listDiv.appendChild(card);
+        });
+    }
+
+    function addCharacter() {
+        const name = document.getElementById('newCharName').value.trim();
+        const prompt = document.getElementById('newCharPrompt').value.trim();
+        const greeting = document.getElementById('newCharGreeting').value.trim() || '你好！';
+        const avatarData = tempImages.tempCharImg || '✨'; 
+
+        if(!name || !prompt) { alert('名字跟設定都要填寫喔！'); return; }
+
+        const newChar = { id: 'c_' + Date.now().toString(), name, avatar: avatarData, prompt, greeting };
+        characters.push(newChar);
+        localStorage.setItem('myCharacters', JSON.stringify(characters));
+        
+        document.getElementById('newCharName').value = '';
+        document.getElementById('newCharPrompt').value = '';
+        document.getElementById('newCharGreeting').value = '';
+        document.getElementById('previewCharAvatar').style.display = 'none';
+        tempImages.tempCharImg = "";
+        
+        renderCharacterList();
+        alert('建立成功！已經幫你收錄到「聯絡人」清單中囉！🎉');
+        
+        // 建立完自動跳轉到角色清單頁
+        switchTab('chars');
+    }
+
+    // --- 多重聊天室 (Sessions) 邏輯 ---
+    function renderSessionList() {
+        const listDiv = document.getElementById('sessionList');
+        listDiv.innerHTML = '';
+        if(chatSessions.length === 0) { listDiv.innerHTML = '<div style="text-align:center; color:#ffb7b2; padding:50px 0; font-size:14px;">目前沒有對話紀錄<br>請到下方「👥 聯絡人」發起聊天！</div>'; return; }
+
+        chatSessions.sort((a, b) => b.time - a.time).forEach(session => {
+            const char = characters.find(c => c.id === session.charId) || { name: '已刪除的角色', avatar: '👻' };
+            const persona = personas.find(p => p.id === session.personaId) || { name: '未知主控' };
+            
+            const card = document.createElement('div');
+            card.className = `card`;
+            card.onclick = () => openSession(session.id);
+            card.innerHTML = `${getAvatarHtml(char.avatar)}<div style="flex:1; overflow:hidden;"><div style="font-weight:bold; color:#555; display:flex; justify-content:space-between;"><span>${char.name}</span><span style="font-size:10px; color:#aaa; font-weight:normal; background:#f0f0f0; padding:2px 6px; border-radius:10px;">👤 ${persona.name}</span></div><div class="desc-text">${session.preview}</div></div>`;
+            listDiv.appendChild(card);
+        });
+    }
+
+    function createNewSession(charId) {
+        const char = characters.find(c => c.id === charId);
+        const persona = personas.find(p => p.id === activePersonaId);
+        
+        const sessionId = 's_' + Date.now().toString();
+        const greetingText = char.greeting || '你好！';
+
+        const newSession = { id: sessionId, charId: charId, personaId: persona.id, preview: greetingText, time: Date.now() };
+        chatSessions.push(newSession);
+        localStorage.setItem('myChatSessions', JSON.stringify(chatSessions));
+        
+        const initialHistory = [{ role: "assistant", content: greetingText }];
+        localStorage.setItem(`history_${sessionId}`, JSON.stringify(initialHistory));
+        
+        openSession(sessionId);
+    }
+
+    function openSession(sessionId) {
+        activeSessionId = sessionId;
+        const session = chatSessions.find(s => s.id === sessionId);
+        const char = characters.find(c => c.id === session.charId) || { name: '已刪除', avatar: '👻' };
+        
+        document.getElementById('chatHeaderName').innerText = char.name;
+        
+        const chatBox = document.getElementById('chatBox');
+        chatBox.innerHTML = '';
+        
+        messageHistory = JSON.parse(localStorage.getItem(`history_${sessionId}`)) || [];
+        messageHistory.forEach(msg => { renderMessageBubble(msg.role, msg.content, session); });
+        
+        switchTab('chat');
+        setTimeout(() => chatBox.scrollTop = chatBox.scrollHeight, 100);
+    }
+
+    function deleteCurrentSession() {
+        if(!activeSessionId) return;
+        if(confirm("確定要刪除整個聊天室紀錄嗎？不可恢復喔！")) {
+            chatSessions = chatSessions.filter(s => s.id !== activeSessionId);
+            localStorage.setItem('myChatSessions', JSON.stringify(chatSessions));
+            localStorage.removeItem(`history_${activeSessionId}`);
+            activeSessionId = null;
+            switchTab('sessions');
+        }
+    }
+
+    function renderMessageBubble(role, text, session) {
+        const chatBox = document.getElementById('chatBox');
+        const char = characters.find(c => c.id === session.charId) || { avatar: '👻' };
+        const persona = personas.find(p => p.id === session.personaId) || { avatar: '🎭' };
+
+        const row = document.createElement('div');
+        row.className = `message-row ${role === 'user' ? 'user' : 'ai'}`;
+        
+        let avatarStyle = ''; let avatarChar = '';
+        const targetAvatar = role === 'user' ? persona.avatar : char.avatar;
+
+        if (targetAvatar && targetAvatar.startsWith('data:image')) avatarStyle = `background-image: url(${targetAvatar}); background-color: transparent;`;
+        else avatarChar = targetAvatar || (role === 'user' ? '🎭' : '✨');
+
+        row.innerHTML = `<div class="msg-avatar" style="${avatarStyle}">${avatarChar}</div><div class="message ${role === 'user' ? 'user-msg' : 'ai-msg'}">${text}</div>`;
+        
+        chatBox.appendChild(row);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return row;
+    }
+
+    // --- API 呼叫 ---
+    async function fetchModels() {
+        let apiUrl = document.getElementById('apiUrl').value.trim() || DEFAULT_API_URL;
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const selectElement = document.getElementById('modelSelect');
+
+        if (!apiKey) { alert("請先貼上 API Key！"); return; }
+
+        let modelsUrl = apiUrl;
+        if (modelsUrl.includes('/chat/completions')) modelsUrl = modelsUrl.replace('/chat/completions', '/models');
+        else if (!modelsUrl.endsWith('/models')) modelsUrl = modelsUrl.replace(/\/$/, '') + '/models';
+
+        selectElement.innerHTML = '<option>🔄 連線中...</option>';
+        try {
+            const response = await fetch(modelsUrl, { headers: { "Authorization": `Bearer ${apiKey}` } });
+            if (!response.ok) throw new Error("連線遭拒");
+            const data = await response.json();
+            let modelsList = data.data || []; 
+            if (modelsList.length === 0) throw new Error("找不到模型");
+            localStorage.setItem('cachedModels', JSON.stringify(modelsList));
+            populateModelSelect(modelsList, modelsList[0].id);
+            alert(`成功抓取 ${modelsList.length} 個模型！`);
+        } catch (error) {
+            selectElement.innerHTML = '<option value="google/gemini-2.5-pro">拉取失敗，使用預設</option>';
+            alert("失敗：" + error.message);
+        }
+    }
+
+    function populateModelSelect(modelsList, selectedId) {
+        const selectElement = document.getElementById('modelSelect');
+        if (modelsList.length === 0) return;
+        selectElement.innerHTML = '';
+        modelsList.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id; opt.innerText = m.name || m.id;
+            if (m.id === selectedId) opt.selected = true;
+            selectElement.appendChild(opt);
+        });
+    }
+
+    function saveSettings() {
+        localStorage.setItem('myApiUrl', document.getElementById('apiUrl').value.trim() || DEFAULT_API_URL);
+        localStorage.setItem('myApiKey', document.getElementById('apiKey').value.trim());
+        localStorage.setItem('mySelectedModel', document.getElementById('modelSelect').value);
+        alert('設定已儲存！');
+    }
+
+    async function sendMessage() {
+        if (!activeSessionId) return;
+        const session = chatSessions.find(s => s.id === activeSessionId);
+        const char = characters.find(c => c.id === session.charId);
+        const persona = personas.find(p => p.id === session.personaId);
+        
+        const apiUrl = localStorage.getItem('myApiUrl') || DEFAULT_API_URL;
+        const apiKey = localStorage.getItem('myApiKey');
+        const selectedModel = localStorage.getItem('mySelectedModel') || document.getElementById('modelSelect').value || "google/gemini-2.5-pro";
+        
+        const inputEl = document.getElementById('userInput');
+        const text = inputEl.value.trim();
+
+        if (!apiKey) { alert("請先到設定填寫 API Key！"); return; }
+        if (!text) return;
+
+        renderMessageBubble('user', text, session);
+        inputEl.value = '';
+        inputEl.style.height = 'auto'; 
+        
+        messageHistory.push({ role: "user", content: text });
+        
+        session.preview = text.substring(0, 20) + (text.length > 20 ? '...' : '');
+        session.time = Date.now();
+        localStorage.setItem('myChatSessions', JSON.stringify(chatSessions));
+        localStorage.setItem(`history_${activeSessionId}`, JSON.stringify(messageHistory));
+
+        let finalSystemPrompt = char ? char.prompt : '';
+        if (persona && persona.prompt) finalSystemPrompt += `\n\n【關於使用者的設定(請以這個設定來認知跟我聊天)】:\n${persona.prompt}`;
+
+        const apiMessages = [ { role: "system", content: finalSystemPrompt }, ...messageHistory ];
+
+        try {
+            const loadingRow = document.createElement('div');
+            loadingRow.className = `message-row ai`;
+            loadingRow.innerHTML = `<div class="msg-avatar">✨</div><div class="message ai-msg">對方正在輸入...</div>`;
+            document.getElementById('chatBox').appendChild(loadingRow);
+            document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight;
+
+            const response = await fetch(apiUrl, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ model: selectedModel, messages: apiMessages })
+            });
+
+            const data = await response.json();
+            loadingRow.remove();
+
+            if (data.choices && data.choices[0].message) {
+                const aiReply = data.choices[0].message.content;
+                renderMessageBubble('assistant', aiReply, session);
+                
+                messageHistory.push({ role: "assistant", content: aiReply });
+                session.preview = aiReply.substring(0, 20) + (aiReply.length > 20 ? '...' : '');
+                session.time = Date.now();
+                localStorage.setItem('myChatSessions', JSON.stringify(chatSessions));
+                localStorage.setItem(`history_${activeSessionId}`, JSON.stringify(messageHistory));
+            } else {
+                renderMessageBubble('assistant', "連線失敗，請檢查 API Key 額度。", session);
+            }
+        } catch (error) {
+            renderMessageBubble('assistant', "網路斷線：" + error.message, session);
+        }
+    }
+</script>
+
+</body>
+</html>
