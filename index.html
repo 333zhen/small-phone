@@ -27,8 +27,6 @@
         .action-btn:active { transform: scale(0.9); }
 
         .chat-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background-image: radial-gradient(#ffc0cb 0.5px, transparent 0.5px); background-size: 20px 20px; padding-bottom: 80px; }
-        
-        /* 氣泡與編輯按鈕的全新排版 */
         .message-row { display: flex; gap: 10px; align-items: flex-end; width: 100%; margin-bottom: 5px; }
         .message-row.user { flex-direction: row-reverse; }
         .message-bubble-wrap { display: flex; align-items: flex-end; gap: 8px; max-width: 75%; }
@@ -36,8 +34,6 @@
         .message { padding: 12px 16px; line-height: 1.5; word-wrap: break-word; font-size: 15px; box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2); white-space: pre-wrap; }
         .user-msg { background: linear-gradient(to right, #ff9a9e, #fecfef); color: white; border-radius: 20px 20px 5px 20px; }
         .ai-msg { background: white; color: #666; border-radius: 20px 20px 20px 5px; border: 1px solid #fff0f5; }
-        
-        /* 編輯小鉛筆 */
         .msg-action { font-size: 14px; cursor: pointer; opacity: 0.4; transition: 0.2s; padding-bottom: 5px; }
         .msg-action:hover { opacity: 1; transform: scale(1.1); }
 
@@ -82,7 +78,7 @@
         .nav-item.active { color: #ff758c; font-weight: bold; transform: translateY(-2px); }
         .nav-icon { font-size: 20px; }
 
-        /* 隱藏訊息編輯彈出視窗 */
+        /* 編輯彈窗 */
         #editMsgModal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(2px); }
         .modal-content { background: white; width: 100%; max-width: 320px; border-radius: 15px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
     </style>
@@ -167,6 +163,16 @@
                 <button class="btn-primary" id="btnSubmitPersona" style="padding: 8px; font-size: 14px;" onclick="submitPersona()">＋ 建立新主控</button>
                 <button class="btn-cancel" id="btnCancelPersona" style="padding: 8px; font-size: 14px;" onclick="cancelEditPersona()">取消編輯</button>
             </div>
+
+            <div id="adminApiSettings" style="display: none;">
+                <hr style="border: 0; border-top: 1px dashed #ffb6c1; margin: 20px 0;">
+                <div style="color: #ff758c; font-weight: bold; margin-bottom: 10px;">🔧 系統與 API 設定 (僅管理員可見)</div>
+                <div style="font-size: 12px; color: #999; margin-bottom: 10px;">注意：填寫在這裡的 API Key 只會保存在「這台手機」裡，不會分享給朋友喔！如果想讓朋友免填 Key，還是得寫在程式碼裡。</div>
+                <div class="form-group"><label>🌐 請求地址</label><input type="text" id="apiUrl" placeholder="預設: https://openrouter.ai/api/v1/chat/completions"></div>
+                <div class="form-group"><label>🔑 API Key</label><input type="password" id="apiKey" placeholder="在此貼上你的 API Key"></div>
+                <div class="form-group"><label>🤖 模型代號</label><input type="text" id="apiModel" placeholder="預設: google/gemini-2.5-pro"></div>
+                <button class="btn-primary" onclick="saveAdminSettings()">💾 儲存系統設定</button>
+            </div>
         </div>
     </div>
 
@@ -198,16 +204,13 @@
     const ADMIN_PASSCODE = "admin123";  
     const USER_PASSCODE = "baby123";    
     
-    // 你的 API Key 與模型
-    const HIDDEN_API_KEY = "在這裡填寫你的_API_KEY"; 
+    // 如果你在畫面上沒有填 Key，系統就會自動吃這裡的預設 Key，這樣閨蜜就可以直接玩！
+    const HIDDEN_API_KEY = "請把你的_API_KEY_貼在這裡"; 
     const HIDDEN_API_URL = "https://openrouter.ai/api/v1/chat/completions";
     const HIDDEN_MODEL = "google/gemini-2.5-pro"; 
 
-    // 🎭 全局預設角色名冊 
-    const SHARED_CHARACTERS = [
-        { id: "char_01", name: "霸道總裁", avatar: "👔", greeting: "女人，你終於捨得出現了？", prompt: "你是一個冷酷但內心深情的霸道總裁，說話霸氣，喜歡叫對方『女人』或『笨蛋』。" },
-        { id: "char_02", name: "溫柔學長", avatar: "📚", greeting: "學妹，今天上課累嗎？", prompt: "你是大學裡的溫柔學長，個性陽光體貼，總是無微不至地照顧學妹。" }
-    ];
+    // 🎭 全局預設角色名冊 (已幫你清空，乾乾淨淨！)
+    const SHARED_CHARACTERS = [];
     // ==========================================
 
     let currentUserRole = null; 
@@ -230,6 +233,11 @@
     let tempImages = { tempCharImg: "", tempPersonaImg: "" };
 
     window.onload = function() {
+        // 載入管理員設定 (如果有)
+        document.getElementById('apiUrl').value = localStorage.getItem('myApiUrl') || HIDDEN_API_URL;
+        document.getElementById('apiKey').value = localStorage.getItem('myApiKey') || ''; 
+        document.getElementById('apiModel').value = localStorage.getItem('myApiModel') || HIDDEN_MODEL;
+
         renderCharacterList();
         renderPersonaList();
         renderSessionList();
@@ -245,9 +253,26 @@
 
     function enterApp(isAdmin) {
         document.getElementById('view-login').style.display = 'none';
-        if(!isAdmin) document.getElementById('nav-create').style.display = 'none';
+        
+        // 根據身分顯示/隱藏功能
+        if(isAdmin) {
+            document.getElementById('nav-create').style.display = 'flex';
+            document.getElementById('adminApiSettings').style.display = 'block';
+        } else {
+            document.getElementById('nav-create').style.display = 'none';
+            document.getElementById('adminApiSettings').style.display = 'none';
+        }
+
         document.getElementById('mainNav').style.display = 'flex';
         switchTab('sessions');
+    }
+
+    // --- 儲存管理員 API 設定 ---
+    function saveAdminSettings() {
+        localStorage.setItem('myApiUrl', document.getElementById('apiUrl').value.trim());
+        localStorage.setItem('myApiKey', document.getElementById('apiKey').value.trim());
+        localStorage.setItem('myApiModel', document.getElementById('apiModel').value.trim());
+        alert('系統設定已儲存！\n(⚠️ 注意：這只會存在這台手機，如果你要分享給別人玩，請把 Key 寫進 GitHub 代碼裡喔)');
     }
 
     // --- UI 切換 ---
@@ -268,173 +293,84 @@
 
     // --- 沉浸式通話 ---
     function startCall() { 
-        if(!activeSessionId) return;
-        const session = chatSessions.find(s => s.id === activeSessionId);
-        const char = characters.find(c => c.id === session.charId);
-        if(!char) return;
+        if(!activeSessionId) return; const session = chatSessions.find(s => s.id === activeSessionId); const char = characters.find(c => c.id === session.charId); if(!char) return;
         const bigAvatar = document.getElementById('callBigAvatar');
         if (char.avatar.startsWith('data:image')) { bigAvatar.style.backgroundImage = `url(${char.avatar})`; bigAvatar.innerText = ''; } else { bigAvatar.style.backgroundImage = 'none'; bigAvatar.innerText = char.avatar || '✨'; }
         document.getElementById('callCharName').innerText = char.name;
         let lastAiMsg = "（安靜的呼吸聲...）";
         for (let i = messageHistory.length - 1; i >= 0; i--) { if (messageHistory[i].role === 'assistant') { lastAiMsg = messageHistory[i].content; break; } }
         document.getElementById('callSubtitle').innerText = lastAiMsg; document.getElementById('callInput').value = '';
-        callSeconds = 0; document.getElementById('callTimer').innerText = `00:00 通話中...`;
-        clearInterval(callTimerInterval);
-        callTimerInterval = setInterval(() => { callSeconds++; let m = Math.floor(callSeconds / 60).toString().padStart(2, '0'); let s = (callSeconds % 60).toString().padStart(2, '0'); document.getElementById('callTimer').innerText = `${m}:${s} 通話中...`; }, 1000);
-        switchTab('call');
+        callSeconds = 0; document.getElementById('callTimer').innerText = `00:00 通話中...`; clearInterval(callTimerInterval);
+        callTimerInterval = setInterval(() => { callSeconds++; let m = Math.floor(callSeconds / 60).toString().padStart(2, '0'); let s = (callSeconds % 60).toString().padStart(2, '0'); document.getElementById('callTimer').innerText = `${m}:${s} 通話中...`; }, 1000); switchTab('call');
     }
     function endCall() { clearInterval(callTimerInterval); switchTab('chat'); setTimeout(() => document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight, 100); }
 
-    // --- 圖片與輔助 ---
+    // --- 圖片 ---
     function processImage(event, previewId, tempVarName) {
         const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
         reader.onload = function(e) { const img = new Image(); img.src = e.target.result; img.onload = function() { const canvas = document.createElement('canvas'); let w = img.width, h = img.height; if (w > h) { if (w > 150) { h *= 150 / w; w = 150; } } else { if (h > 150) { w *= 150 / h; h = 150; } } canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h); tempImages[tempVarName] = canvas.toDataURL('image/jpeg', 0.8); const box = document.getElementById(previewId); box.style.backgroundImage = `url(${tempImages[tempVarName]})`; box.style.display = 'flex'; box.innerText = ''; } }; reader.readAsDataURL(file);
     }
     function getAvatarHtml(avatarData) { if (!avatarData) return `<div class="avatar">✨</div>`; if (avatarData.startsWith('data:image')) return `<div class="avatar" style="background-image: url(${avatarData}); background-color: transparent;"></div>`; return `<div class="avatar">${avatarData}</div>`; }
 
-    // ==========================================
-    // ✏️ 主控與角色渲染邏輯 (CRUD)
-    // ==========================================
+    // --- 主控 (Persona) ---
     function renderPersonaList() {
         const listDiv = document.getElementById('personaList'); listDiv.innerHTML = '';
         personas.forEach(p => { 
             const isActive = p.id === activePersonaId ? 'active' : ''; const card = document.createElement('div'); card.className = `card ${isActive}`; 
-            const contentDiv = document.createElement('div'); contentDiv.className = 'card-content'; 
-            contentDiv.onclick = () => { activePersonaId = p.id; localStorage.setItem('activePersonaId', p.id); renderPersonaList(); }; 
-            contentDiv.innerHTML = `${getAvatarHtml(p.avatar)}<div style="flex:1; overflow:hidden;"><div style="font-weight:bold; color:#555;">${p.name} ${isActive ? '✅(使用中)' : ''}</div><div class="desc-text">${p.prompt || '無設定'}</div></div>`; 
-            card.appendChild(contentDiv);
+            const contentDiv = document.createElement('div'); contentDiv.className = 'card-content'; contentDiv.onclick = () => { activePersonaId = p.id; localStorage.setItem('activePersonaId', p.id); renderPersonaList(); }; 
+            contentDiv.innerHTML = `${getAvatarHtml(p.avatar)}<div style="flex:1; overflow:hidden;"><div style="font-weight:bold; color:#555;">${p.name} ${isActive ? '✅(使用中)' : ''}</div><div class="desc-text">${p.prompt || '無設定'}</div></div>`; card.appendChild(contentDiv);
             if (p.id !== 'default') { 
                 const actGroup = document.createElement('div'); actGroup.className = 'action-group';
-                const editBtn = document.createElement('div'); editBtn.className = 'edit-btn'; editBtn.innerHTML = '✏️';
-                editBtn.onclick = (e) => { e.stopPropagation(); editPersonaMode(p.id); }; actGroup.appendChild(editBtn);
-                const delBtn = document.createElement('div'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '🗑️'; 
-                delBtn.onclick = (e) => { e.stopPropagation(); if(confirm("刪除此主控？")) { personas = personas.filter(x => x.id !== p.id); localStorage.setItem('myPersonas', JSON.stringify(personas)); if(activePersonaId === p.id) activePersonaId = 'default'; renderPersonaList(); } }; 
-                actGroup.appendChild(delBtn); card.appendChild(actGroup); 
+                const editBtn = document.createElement('div'); editBtn.className = 'edit-btn'; editBtn.innerHTML = '✏️'; editBtn.onclick = (e) => { e.stopPropagation(); editPersonaMode(p.id); }; actGroup.appendChild(editBtn);
+                const delBtn = document.createElement('div'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '🗑️'; delBtn.onclick = (e) => { e.stopPropagation(); if(confirm("刪除此主控？")) { personas = personas.filter(x => x.id !== p.id); localStorage.setItem('myPersonas', JSON.stringify(personas)); if(activePersonaId === p.id) activePersonaId = 'default'; renderPersonaList(); } }; actGroup.appendChild(delBtn); card.appendChild(actGroup); 
             } listDiv.appendChild(card); 
         });
     }
+    function editPersonaMode(id) { const p = personas.find(x => x.id === id); if(!p) return; editingPersonaId = id; document.getElementById('newPersonaName').value = p.name; document.getElementById('newPersonaPrompt').value = p.prompt; const preview = document.getElementById('previewPersonaAvatar'); if(p.avatar.startsWith('data:image')) { tempImages.tempPersonaImg = p.avatar; preview.style.backgroundImage = `url(${p.avatar})`; preview.style.display = 'flex'; preview.innerText = ''; } else { tempImages.tempPersonaImg = p.avatar; preview.style.backgroundImage = 'none'; preview.style.display = 'flex'; preview.innerText = p.avatar; } document.getElementById('personaFormTitle').innerText = '✏️ 編輯主控'; document.getElementById('btnSubmitPersona').innerText = '💾 儲存修改'; document.getElementById('btnCancelPersona').style.display = 'block'; document.getElementById('personaFormArea').scrollIntoView({ behavior: 'smooth' }); }
+    function cancelEditPersona() { editingPersonaId = null; document.getElementById('newPersonaName').value = ''; document.getElementById('newPersonaPrompt').value = ''; document.getElementById('previewPersonaAvatar').style.display = 'none'; tempImages.tempPersonaImg = ""; document.getElementById('personaFormTitle').innerText = '➕ 新增主控'; document.getElementById('btnSubmitPersona').innerText = '＋ 建立新主控'; document.getElementById('btnCancelPersona').style.display = 'none'; }
+    function submitPersona() { const name = document.getElementById('newPersonaName').value.trim(); if(!name) { alert('主控名稱必填喔！'); return; } const avatarData = tempImages.tempPersonaImg || '🎭'; const promptData = document.getElementById('newPersonaPrompt').value.trim(); if (editingPersonaId) { const idx = personas.findIndex(p => p.id === editingPersonaId); if (idx > -1) { personas[idx].name = name; personas[idx].avatar = avatarData; personas[idx].prompt = promptData; } alert('修改成功！'); } else { const newP = { id: 'p_' + Date.now(), name, avatar: avatarData, prompt: promptData }; personas.push(newP); activePersonaId = newP.id; localStorage.setItem('activePersonaId', newP.id); alert('建立成功！'); } localStorage.setItem('myPersonas', JSON.stringify(personas)); cancelEditPersona(); renderPersonaList(); }
 
-    function editPersonaMode(id) {
-        const p = personas.find(x => x.id === id); if(!p) return; editingPersonaId = id;
-        document.getElementById('newPersonaName').value = p.name; document.getElementById('newPersonaPrompt').value = p.prompt;
-        const preview = document.getElementById('previewPersonaAvatar');
-        if(p.avatar.startsWith('data:image')) { tempImages.tempPersonaImg = p.avatar; preview.style.backgroundImage = `url(${p.avatar})`; preview.style.display = 'flex'; preview.innerText = ''; } 
-        else { tempImages.tempPersonaImg = p.avatar; preview.style.backgroundImage = 'none'; preview.style.display = 'flex'; preview.innerText = p.avatar; }
-        document.getElementById('personaFormTitle').innerText = '✏️ 編輯主控'; document.getElementById('btnSubmitPersona').innerText = '💾 儲存修改'; document.getElementById('btnCancelPersona').style.display = 'block';
-        document.getElementById('personaFormArea').scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function cancelEditPersona() {
-        editingPersonaId = null; document.getElementById('newPersonaName').value = ''; document.getElementById('newPersonaPrompt').value = ''; document.getElementById('previewPersonaAvatar').style.display = 'none'; tempImages.tempPersonaImg = "";
-        document.getElementById('personaFormTitle').innerText = '➕ 新增主控'; document.getElementById('btnSubmitPersona').innerText = '＋ 建立新主控'; document.getElementById('btnCancelPersona').style.display = 'none';
-    }
-
-    function submitPersona() { 
-        const name = document.getElementById('newPersonaName').value.trim(); if(!name) { alert('主控名稱必填喔！'); return; } 
-        const avatarData = tempImages.tempPersonaImg || '🎭'; const promptData = document.getElementById('newPersonaPrompt').value.trim();
-        if (editingPersonaId) { const idx = personas.findIndex(p => p.id === editingPersonaId); if (idx > -1) { personas[idx].name = name; personas[idx].avatar = avatarData; personas[idx].prompt = promptData; } alert('修改成功！'); } 
-        else { const newP = { id: 'p_' + Date.now(), name, avatar: avatarData, prompt: promptData }; personas.push(newP); activePersonaId = newP.id; localStorage.setItem('activePersonaId', newP.id); alert('建立成功！'); }
-        localStorage.setItem('myPersonas', JSON.stringify(personas)); cancelEditPersona(); renderPersonaList(); 
-    }
-
+    // --- 角色 (Character) ---
     function renderCharacterList() {
         const listDiv = document.getElementById('charList'); listDiv.innerHTML = '';
         if(characters.length === 0) { listDiv.innerHTML = currentUserRole === 'admin' ? '<div style="text-align:center; color:#ffb7b2; padding-top:20px;">空空的...去「新增」建立角色吧！</div>' : '<div style="text-align:center; color:#ffb7b2; padding-top:20px;">管理員還沒建立角色喔！</div>'; return; }
         characters.forEach(char => { 
-            const card = document.createElement('div'); card.className = `card`; 
-            const contentDiv = document.createElement('div'); contentDiv.className = 'card-content'; 
-            contentDiv.onclick = () => createNewSession(char.id); 
-            contentDiv.innerHTML = `${getAvatarHtml(char.avatar)}<div style="flex:1;"><div style="font-weight:bold; color:#ff758c;">${char.name}</div><div class="desc-text">點擊創建聊天</div></div>`; card.appendChild(contentDiv);
+            const card = document.createElement('div'); card.className = `card`; const contentDiv = document.createElement('div'); contentDiv.className = 'card-content'; contentDiv.onclick = () => createNewSession(char.id); contentDiv.innerHTML = `${getAvatarHtml(char.avatar)}<div style="flex:1;"><div style="font-weight:bold; color:#ff758c;">${char.name}</div><div class="desc-text">點擊創建聊天</div></div>`; card.appendChild(contentDiv);
             if(currentUserRole === 'admin') { 
                 const actGroup = document.createElement('div'); actGroup.className = 'action-group';
-                const editBtn = document.createElement('div'); editBtn.className = 'edit-btn'; editBtn.innerHTML = '✏️';
-                editBtn.onclick = (e) => { e.stopPropagation(); editCharMode(char.id); }; actGroup.appendChild(editBtn);
-                const delBtn = document.createElement('div'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '🗑️'; 
-                delBtn.onclick = (e) => { e.stopPropagation(); if(confirm("確定刪除角色？")) { characters = characters.filter(c => c.id !== char.id); localStorage.setItem('myCharacters', JSON.stringify(characters)); renderCharacterList(); } }; 
-                actGroup.appendChild(delBtn); card.appendChild(actGroup); 
+                const editBtn = document.createElement('div'); editBtn.className = 'edit-btn'; editBtn.innerHTML = '✏️'; editBtn.onclick = (e) => { e.stopPropagation(); editCharMode(char.id); }; actGroup.appendChild(editBtn);
+                const delBtn = document.createElement('div'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '🗑️'; delBtn.onclick = (e) => { e.stopPropagation(); if(confirm("確定刪除角色？")) { characters = characters.filter(c => c.id !== char.id); localStorage.setItem('myCharacters', JSON.stringify(characters)); renderCharacterList(); } }; actGroup.appendChild(delBtn); card.appendChild(actGroup); 
             } listDiv.appendChild(card); 
         });
     }
-
-    function editCharMode(id) {
-        const char = characters.find(c => c.id === id); if(!char) return; editingCharId = id;
-        document.getElementById('newCharName').value = char.name; document.getElementById('newCharGreeting').value = char.greeting; document.getElementById('newCharPrompt').value = char.prompt;
-        const preview = document.getElementById('previewCharAvatar');
-        if(char.avatar.startsWith('data:image')) { tempImages.tempCharImg = char.avatar; preview.style.backgroundImage = `url(${char.avatar})`; preview.style.display = 'flex'; preview.innerText = ''; } 
-        else { tempImages.tempCharImg = char.avatar; preview.style.backgroundImage = 'none'; preview.style.display = 'flex'; preview.innerText = char.avatar; }
-        document.getElementById('createViewTitle').innerText = '✏️ 編輯角色'; document.getElementById('navCreateText').innerText = '編輯中'; document.getElementById('btnSubmitChar').innerText = '💾 儲存角色修改'; document.getElementById('btnCancelChar').style.display = 'block'; switchTab('create');
+    function editCharMode(id) { const char = characters.find(c => c.id === id); if(!char) return; editingCharId = id; document.getElementById('newCharName').value = char.name; document.getElementById('newCharGreeting').value = char.greeting; document.getElementById('newCharPrompt').value = char.prompt; const preview = document.getElementById('previewCharAvatar'); if(char.avatar.startsWith('data:image')) { tempImages.tempCharImg = char.avatar; preview.style.backgroundImage = `url(${char.avatar})`; preview.style.display = 'flex'; preview.innerText = ''; } else { tempImages.tempCharImg = char.avatar; preview.style.backgroundImage = 'none'; preview.style.display = 'flex'; preview.innerText = char.avatar; } document.getElementById('createViewTitle').innerText = '✏️ 編輯角色'; document.getElementById('navCreateText').innerText = '編輯中'; document.getElementById('btnSubmitChar').innerText = '💾 儲存角色修改'; document.getElementById('btnCancelChar').style.display = 'block'; switchTab('create'); }
+    function cancelEditChar() { editingCharId = null; document.getElementById('newCharName').value = ''; document.getElementById('newCharPrompt').value = ''; document.getElementById('newCharGreeting').value = ''; document.getElementById('previewCharAvatar').style.display = 'none'; tempImages.tempCharImg = ""; document.getElementById('createViewTitle').innerText = '✨ 創造新角色'; document.getElementById('navCreateText').innerText = '新增'; document.getElementById('btnSubmitChar').innerText = '＋ 完成並建立角色'; document.getElementById('btnCancelChar').style.display = 'none'; }
+    function submitCharacter() { const name = document.getElementById('newCharName').value.trim(); const prompt = document.getElementById('newCharPrompt').value.trim(); if(!name || !prompt) { alert('名字跟設定都要填寫！'); return; } const greeting = document.getElementById('newCharGreeting').value.trim() || '你好！'; const avatarData = tempImages.tempCharImg || '✨';
+        if(editingCharId) { const idx = characters.findIndex(c => c.id === editingCharId); if(idx > -1) { characters[idx].name = name; characters[idx].avatar = avatarData; characters[idx].prompt = prompt; characters[idx].greeting = greeting; } alert('修改成功！'); } else { const newChar = { id: 'c_' + Date.now(), name, avatar: avatarData, prompt, greeting }; characters.push(newChar); alert('建立成功！'); } localStorage.setItem('myCharacters', JSON.stringify(characters)); cancelEditChar(); renderCharacterList(); switchTab('chars'); 
     }
 
-    function cancelEditChar() {
-        editingCharId = null; document.getElementById('newCharName').value = ''; document.getElementById('newCharPrompt').value = ''; document.getElementById('newCharGreeting').value = ''; document.getElementById('previewCharAvatar').style.display = 'none'; tempImages.tempCharImg = "";
-        document.getElementById('createViewTitle').innerText = '✨ 創造新角色'; document.getElementById('navCreateText').innerText = '新增'; document.getElementById('btnSubmitChar').innerText = '＋ 完成並建立角色'; document.getElementById('btnCancelChar').style.display = 'none';
-    }
-
-    function submitCharacter() { 
-        const name = document.getElementById('newCharName').value.trim(); const prompt = document.getElementById('newCharPrompt').value.trim(); if(!name || !prompt) { alert('名字跟設定都要填寫！'); return; } 
-        const greeting = document.getElementById('newCharGreeting').value.trim() || '你好！'; const avatarData = tempImages.tempCharImg || '✨';
-        if(editingCharId) { const idx = characters.findIndex(c => c.id === editingCharId); if(idx > -1) { characters[idx].name = name; characters[idx].avatar = avatarData; characters[idx].prompt = prompt; characters[idx].greeting = greeting; } alert('修改成功！'); } 
-        else { const newChar = { id: 'c_' + Date.now(), name, avatar: avatarData, prompt, greeting }; characters.push(newChar); alert('建立成功！'); }
-        localStorage.setItem('myCharacters', JSON.stringify(characters)); cancelEditChar(); renderCharacterList(); switchTab('chars'); 
-    }
-
-    // ==========================================
-    // 💬 多重聊天室與「訊息修改」渲染引擎
-    // ==========================================
+    // --- 聊天紀錄 ---
     function renderSessionList() {
         const listDiv = document.getElementById('sessionList'); listDiv.innerHTML = '';
         if(chatSessions.length === 0) { listDiv.innerHTML = '<div style="text-align:center; color:#ffb7b2; padding:50px 0;">無紀錄，請去聯絡人發起聊天！</div>'; return; }
         chatSessions.sort((a, b) => b.time - a.time).forEach(session => { const char = characters.find(c => c.id === session.charId) || { name: '已刪除', avatar: '👻' }; const persona = personas.find(p => p.id === session.personaId) || { name: '未知' }; const card = document.createElement('div'); card.className = `card`; card.onclick = () => openSession(session.id); card.innerHTML = `${getAvatarHtml(char.avatar)}<div style="flex:1; overflow:hidden;"><div style="font-weight:bold; color:#555; display:flex; justify-content:space-between;"><span>${char.name}</span><span style="font-size:10px; color:#aaa; background:#f0f0f0; padding:2px 6px; border-radius:10px;">👤 ${persona.name}</span></div><div class="desc-text">${session.preview}</div></div>`; listDiv.appendChild(card); });
     }
+    function createNewSession(charId) { const char = characters.find(c => c.id === charId); const persona = personas.find(p => p.id === activePersonaId); const sessionId = 's_' + Date.now(); const greetingText = char.greeting || '你好！'; chatSessions.push({ id: sessionId, charId: charId, personaId: persona.id, preview: greetingText, time: Date.now() }); localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); localStorage.setItem(`history_${sessionId}`, JSON.stringify([{ role: "assistant", content: greetingText }])); openSession(sessionId); }
+    function openSession(sessionId) { activeSessionId = sessionId; const session = chatSessions.find(s => s.id === sessionId); const char = characters.find(c => c.id === session.charId) || { name: '已刪除', avatar: '👻' }; document.getElementById('chatHeaderName').innerText = char.name; messageHistory = JSON.parse(localStorage.getItem(`history_${sessionId}`)) || []; renderChatBox(); switchTab('chat'); }
+    function deleteCurrentSession() { if(!activeSessionId) return; if(confirm("確定刪除此對話？")) { chatSessions = chatSessions.filter(s => s.id !== activeSessionId); localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); localStorage.removeItem(`history_${activeSessionId}`); activeSessionId = null; switchTab('sessions'); } }
 
-    function createNewSession(charId) { 
-        const char = characters.find(c => c.id === charId); const persona = personas.find(p => p.id === activePersonaId); 
-        const sessionId = 's_' + Date.now(); const greetingText = char.greeting || '你好！'; 
-        chatSessions.push({ id: sessionId, charId: charId, personaId: persona.id, preview: greetingText, time: Date.now() }); 
-        localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); 
-        localStorage.setItem(`history_${sessionId}`, JSON.stringify([{ role: "assistant", content: greetingText }])); 
-        openSession(sessionId); 
-    }
-
-    function openSession(sessionId) { 
-        activeSessionId = sessionId; const session = chatSessions.find(s => s.id === sessionId); 
-        const char = characters.find(c => c.id === session.charId) || { name: '已刪除', avatar: '👻' }; 
-        document.getElementById('chatHeaderName').innerText = char.name; 
-        
-        messageHistory = JSON.parse(localStorage.getItem(`history_${sessionId}`)) || []; 
-        renderChatBox(); // 統一使用 renderChatBox 畫出所有對話
-        switchTab('chat'); 
-    }
-
-    function deleteCurrentSession() { 
-        if(!activeSessionId) return; 
-        if(confirm("確定刪除此對話？")) { 
-            chatSessions = chatSessions.filter(s => s.id !== activeSessionId); 
-            localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); 
-            localStorage.removeItem(`history_${activeSessionId}`); 
-            activeSessionId = null; switchTab('sessions'); 
-        } 
-    }
-
-    // 🌟 統一的聊天室繪製引擎 (支援動態修改)
     function renderChatBox() {
         if (!activeSessionId) return;
-        const chatBox = document.getElementById('chatBox'); 
-        chatBox.innerHTML = ''; 
+        const chatBox = document.getElementById('chatBox'); chatBox.innerHTML = ''; 
         const session = chatSessions.find(s => s.id === activeSessionId);
         const char = characters.find(c => c.id === session.charId) || { avatar: '👻' }; 
         const persona = personas.find(p => p.id === session.personaId) || { avatar: '🎭' }; 
         
         messageHistory.forEach((msg, index) => {
-            const row = document.createElement('div'); 
-            row.className = `message-row ${msg.role === 'user' ? 'user' : 'ai'}`; 
-            
+            const row = document.createElement('div'); row.className = `message-row ${msg.role === 'user' ? 'user' : 'ai'}`; 
             let avatarStyle = ''; let avatarChar = ''; 
             const targetAvatar = msg.role === 'user' ? persona.avatar : char.avatar; 
-            if (targetAvatar && targetAvatar.startsWith('data:image')) avatarStyle = `background-image: url(${targetAvatar}); background-color: transparent;`; 
-            else avatarChar = targetAvatar || (msg.role === 'user' ? '🎭' : '✨'); 
-
-            // 在氣泡旁邊塞入修改按鈕 ✏️
+            if (targetAvatar && targetAvatar.startsWith('data:image')) avatarStyle = `background-image: url(${targetAvatar}); background-color: transparent;`; else avatarChar = targetAvatar || (msg.role === 'user' ? '🎭' : '✨'); 
             row.innerHTML = `
                 <div class="msg-avatar" style="${avatarStyle}">${avatarChar}</div>
                 <div class="message-bubble-wrap ${msg.role === 'user' ? 'user-wrap' : 'ai-wrap'}">
@@ -447,111 +383,57 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // ==========================================
-    // 🔮 訊息修改魔法功能
-    // ==========================================
-    function openEditMsgModal(index) {
-        const msg = messageHistory[index];
-        document.getElementById('editMsgIndex').value = index;
-        document.getElementById('editMsgTextarea').value = msg.content;
-        document.getElementById('editMsgModal').style.display = 'flex';
-    }
-
-    function closeEditMsgModal() {
-        document.getElementById('editMsgModal').style.display = 'none';
-    }
-
+    // --- 編輯訊息 ---
+    function openEditMsgModal(index) { document.getElementById('editMsgIndex').value = index; document.getElementById('editMsgTextarea').value = messageHistory[index].content; document.getElementById('editMsgModal').style.display = 'flex'; }
+    function closeEditMsgModal() { document.getElementById('editMsgModal').style.display = 'none'; }
     function saveEditedMessage() {
-        const index = parseInt(document.getElementById('editMsgIndex').value);
-        const newText = document.getElementById('editMsgTextarea').value.trim();
-        
+        const index = parseInt(document.getElementById('editMsgIndex').value); const newText = document.getElementById('editMsgTextarea').value.trim();
         if (!newText) { alert("訊息不能空白喔！"); return; }
-
-        // 修改陣列裡的紀錄
-        messageHistory[index].content = newText;
-        localStorage.setItem(`history_${activeSessionId}`, JSON.stringify(messageHistory));
-
-        // 如果修改的是最後一則訊息，要順便更新列表的預覽文字
-        if (index === messageHistory.length - 1) {
-            const session = chatSessions.find(s => s.id === activeSessionId);
-            session.preview = newText.substring(0, 20) + (newText.length > 20 ? '...' : '');
-            localStorage.setItem('myChatSessions', JSON.stringify(chatSessions));
-        }
-
-        closeEditMsgModal();
-        renderChatBox(); // 重新畫出整個聊天室，更新完成！
+        messageHistory[index].content = newText; localStorage.setItem(`history_${activeSessionId}`, JSON.stringify(messageHistory));
+        if (index === messageHistory.length - 1) { const session = chatSessions.find(s => s.id === activeSessionId); session.preview = newText.substring(0, 20) + (newText.length > 20 ? '...' : ''); localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); }
+        closeEditMsgModal(); renderChatBox();
     }
 
-
-    // --- 🚀 核心對話發送系統 ---
+    // --- 發送訊息 API ---
     async function processMessage(source) {
         if (!activeSessionId) return;
-        const session = chatSessions.find(s => s.id === activeSessionId);
-        const char = characters.find(c => c.id === session.charId);
-        const persona = personas.find(p => p.id === session.personaId);
+        const session = chatSessions.find(s => s.id === activeSessionId); const char = characters.find(c => c.id === session.charId); const persona = personas.find(p => p.id === session.personaId);
         
-        const inputId = source === 'chat' ? 'chatInput' : 'callInput';
-        const inputEl = document.getElementById(inputId);
-        const text = inputEl.value.trim();
+        // 優先讀取你在畫面上填的 API Key，如果沒填，就讀取程式碼裡隱藏的 API Key！
+        const apiUrl = localStorage.getItem('myApiUrl') || HIDDEN_API_URL;
+        const apiKey = localStorage.getItem('myApiKey') || HIDDEN_API_KEY;
+        const selectedModel = localStorage.getItem('myApiModel') || HIDDEN_MODEL;
 
-        if (!HIDDEN_API_KEY || HIDDEN_API_KEY.includes("在這裡填寫")) { alert("管理員尚未在系統底層設定 API Key！"); return; }
+        const inputId = source === 'chat' ? 'chatInput' : 'callInput'; const inputEl = document.getElementById(inputId); const text = inputEl.value.trim();
+        if (!apiKey || apiKey.includes("在這裡填寫")) { alert("尚未設定 API Key！請用 admin123 登入後去設定，或在程式碼中填寫！"); return; }
         if (!text) return;
 
-        // 1. 存入記憶並重新畫圖
-        messageHistory.push({ role: "user", content: text });
-        renderChatBox();
-        
+        messageHistory.push({ role: "user", content: text }); renderChatBox();
         if (source === 'call') document.getElementById('callSubtitle').innerHTML = `<span style="color:#ffb7b2;">我：</span>${text}`;
         inputEl.value = ''; inputEl.style.height = 'auto'; 
         
         session.preview = text.substring(0, 20) + (text.length > 20 ? '...' : ''); session.time = Date.now();
-        localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); 
-        localStorage.setItem(`history_${activeSessionId}`, JSON.stringify(messageHistory));
+        localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); localStorage.setItem(`history_${activeSessionId}`, JSON.stringify(messageHistory));
 
-        // 2. 打包給 AI 
         let finalSystemPrompt = char ? char.prompt : '';
         if (persona && persona.prompt) finalSystemPrompt += `\n\n【關於使用者的設定(請以這個設定來認知跟我聊天)】:\n${persona.prompt}`;
         const apiMessages = [ { role: "system", content: finalSystemPrompt }, ...messageHistory ];
 
         try {
-            // 讀取動畫
             let loadingRow;
-            if (source === 'chat') { 
-                loadingRow = document.createElement('div'); loadingRow.className = `message-row ai`; 
-                loadingRow.innerHTML = `<div class="msg-avatar">✨</div><div class="message-bubble-wrap ai-wrap"><div class="message ai-msg">對方正在輸入...</div></div>`; 
-                document.getElementById('chatBox').appendChild(loadingRow); 
-                document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight; 
-            } else { 
-                document.getElementById('callSubtitle').innerHTML = `<span style="color:#aaa;">(對方正在思考...)</span>`; 
-            }
+            if (source === 'chat') { loadingRow = document.createElement('div'); loadingRow.className = `message-row ai`; loadingRow.innerHTML = `<div class="msg-avatar">✨</div><div class="message-bubble-wrap ai-wrap"><div class="message ai-msg">對方正在輸入...</div></div>`; document.getElementById('chatBox').appendChild(loadingRow); document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight; } else { document.getElementById('callSubtitle').innerHTML = `<span style="color:#aaa;">(對方正在思考...)</span>`; }
 
-            const response = await fetch(HIDDEN_API_URL, {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${HIDDEN_API_KEY}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ model: HIDDEN_MODEL, messages: apiMessages })
-            });
-
+            const response = await fetch(apiUrl, { method: "POST", headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: selectedModel, messages: apiMessages }) });
             const data = await response.json();
             if (loadingRow) loadingRow.remove();
 
             if (data.choices && data.choices[0].message) {
-                const aiReply = data.choices[0].message.content;
-                
-                // 收到回覆，存入記憶並重新畫圖
-                messageHistory.push({ role: "assistant", content: aiReply });
-                renderChatBox();
-                
+                const aiReply = data.choices[0].message.content; messageHistory.push({ role: "assistant", content: aiReply }); renderChatBox();
                 if (source === 'call') document.getElementById('callSubtitle').innerText = aiReply;
-                
                 session.preview = aiReply.substring(0, 20) + (aiReply.length > 20 ? '...' : ''); session.time = Date.now();
-                localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); 
-                localStorage.setItem(`history_${activeSessionId}`, JSON.stringify(messageHistory));
-            } else {
-                alert("連線失敗，請聯繫管理員檢查額度。");
-            }
-        } catch (error) {
-            alert("網路斷線：" + error.message);
-        }
+                localStorage.setItem('myChatSessions', JSON.stringify(chatSessions)); localStorage.setItem(`history_${activeSessionId}`, JSON.stringify(messageHistory));
+            } else { alert("連線失敗，請檢查 API Key 或額度。"); }
+        } catch (error) { alert("網路斷線：" + error.message); }
     }
 </script>
 
