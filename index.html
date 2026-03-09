@@ -34,8 +34,6 @@
         .message { padding: 12px 16px; line-height: 1.5; word-wrap: break-word; font-size: 15px; box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2); white-space: pre-wrap; }
         .user-msg { background: linear-gradient(to right, #ff9a9e, #fecfef); color: white; border-radius: 20px 20px 5px 20px; }
         .ai-msg { background: white; color: #666; border-radius: 20px 20px 20px 5px; border: 1px solid #fff0f5; }
-        
-        /* 🔥 訊息編輯小鉛筆 (絕對明顯版) */
         .msg-action { font-size: 16px; cursor: pointer; padding: 5px; background: rgba(255, 255, 255, 0.8); border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .msg-action:active { transform: scale(0.9); }
 
@@ -71,7 +69,7 @@
         .card-content { display: flex; align-items: center; gap: 15px; flex: 1; overflow: hidden; }
         .desc-text { font-size: 12px; color: #999; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: normal; }
         
-        /* 🔥 卡片操作區 (聯絡人與主控的鉛筆和垃圾桶) */
+        /* 🔥 卡片操作區 */
         .action-group { display: flex; gap: 10px; align-items: center; margin-left: 10px; }
         .edit-btn, .delete-btn { font-size: 20px; padding: 8px; cursor: pointer; background: #fffafa; border-radius: 50%; box-shadow: 0 2px 5px rgba(255, 182, 193, 0.3); transition: transform 0.2s; }
         .edit-btn:active, .delete-btn:active { transform: scale(0.9); }
@@ -221,12 +219,10 @@
     const ADMIN_PASSCODE = "admin123";  
     const USER_PASSCODE = "baby123";    
     
-    // 你的 API Key 與模型
     const HIDDEN_API_KEY = "請把你的_API_KEY_貼在這裡"; 
     const HIDDEN_API_URL = "https://openrouter.ai/api/v1/chat/completions";
     const HIDDEN_MODEL = "google/gemini-2.5-pro"; 
 
-    // 🎭 全局預設角色名冊 
     const SHARED_CHARACTERS = [];
     // ==========================================
 
@@ -257,9 +253,7 @@
         const savedSelectedModel = localStorage.getItem('mySelectedModel') || HIDDEN_MODEL;
         populateModelSelect(savedModels, savedSelectedModel);
 
-        renderCharacterList();
-        renderPersonaList();
-        renderSessionList();
+        // 初始化時不渲染聯絡人鉛筆，因為還沒登入！
     }
 
     // --- 🔑 登入檢驗 ---
@@ -272,9 +266,22 @@
 
     function enterApp(isAdmin) {
         document.getElementById('view-login').style.display = 'none';
-        if(isAdmin) { document.getElementById('nav-create').style.display = 'flex'; document.getElementById('adminApiSettings').style.display = 'block'; } 
-        else { document.getElementById('nav-create').style.display = 'none'; document.getElementById('adminApiSettings').style.display = 'none'; }
-        document.getElementById('mainNav').style.display = 'flex'; switchTab('sessions');
+        
+        if(isAdmin) { 
+            document.getElementById('nav-create').style.display = 'flex'; 
+            document.getElementById('adminApiSettings').style.display = 'block'; 
+        } else { 
+            document.getElementById('nav-create').style.display = 'none'; 
+            document.getElementById('adminApiSettings').style.display = 'none'; 
+        }
+        
+        // 🔥 就是這裡！確認身分後重新畫出卡片，確保鉛筆跟垃圾桶會出現！
+        renderCharacterList();
+        renderPersonaList();
+        renderSessionList();
+
+        document.getElementById('mainNav').style.display = 'flex'; 
+        switchTab('sessions');
     }
 
     // --- 一鍵拉取 API 模型 ---
@@ -328,7 +335,12 @@
         document.getElementById(`view-${tabName}`).classList.add('active');
         const navBtn = document.getElementById(`nav-${tabName}`); if(navBtn) navBtn.classList.add('active');
         if(['sessions', 'chars', 'create', 'settings'].includes(tabName)) document.getElementById('mainNav').style.display = 'flex'; else document.getElementById('mainNav').style.display = 'none';
+        
+        // 🔥 切換分頁時，也確保畫面強制更新
         if(tabName === 'sessions') renderSessionList();
+        if(tabName === 'chars') renderCharacterList();
+        if(tabName === 'settings') renderPersonaList();
+        
         if(tabName !== 'create' && editingCharId) cancelEditChar();
     }
 
@@ -386,14 +398,12 @@
                 const actGroup = document.createElement('div'); 
                 actGroup.className = 'action-group';
                 
-                // 角色的編輯鉛筆
                 const editBtn = document.createElement('div'); 
                 editBtn.className = 'edit-btn'; 
                 editBtn.innerHTML = '✏️'; 
                 editBtn.onclick = (e) => { e.stopPropagation(); editCharMode(char.id); }; 
                 actGroup.appendChild(editBtn);
                 
-                // 角色的刪除垃圾桶
                 const delBtn = document.createElement('div'); 
                 delBtn.className = 'delete-btn'; 
                 delBtn.innerHTML = '🗑️'; 
@@ -435,7 +445,6 @@
             const targetAvatar = msg.role === 'user' ? persona.avatar : char.avatar; 
             if (targetAvatar && targetAvatar.startsWith('data:image')) avatarStyle = `background-image: url(${targetAvatar}); background-color: transparent;`; else avatarChar = targetAvatar || (msg.role === 'user' ? '🎭' : '✨'); 
             
-            // 🔥 氣泡與編輯鉛筆渲染區塊
             row.innerHTML = `
                 <div class="msg-avatar" style="${avatarStyle}">${avatarChar}</div>
                 <div class="message-bubble-wrap ${msg.role === 'user' ? 'user-wrap' : 'ai-wrap'}">
