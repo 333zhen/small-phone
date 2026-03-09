@@ -34,8 +34,10 @@
         .message { padding: 12px 16px; line-height: 1.5; word-wrap: break-word; font-size: 15px; box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2); white-space: pre-wrap; }
         .user-msg { background: linear-gradient(to right, #ff9a9e, #fecfef); color: white; border-radius: 20px 20px 5px 20px; }
         .ai-msg { background: white; color: #666; border-radius: 20px 20px 20px 5px; border: 1px solid #fff0f5; }
-        .msg-action { font-size: 14px; cursor: pointer; opacity: 0.4; transition: 0.2s; padding-bottom: 5px; }
-        .msg-action:hover { opacity: 1; transform: scale(1.1); }
+        
+        /* 🔥 訊息編輯小鉛筆 (絕對明顯版) */
+        .msg-action { font-size: 16px; cursor: pointer; padding: 5px; background: rgba(255, 255, 255, 0.8); border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .msg-action:active { transform: scale(0.9); }
 
         /* 輸入區 */
         .input-area { background: white; padding: 12px 15px; display: flex; gap: 10px; border-top: 1px solid #ffe4e1; align-items: flex-end; position: absolute; bottom: 0; width: 100%; box-sizing: border-box; z-index: 30; }
@@ -63,12 +65,17 @@
         .btn-primary { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: white; border: none; padding: 12px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 3px 8px rgba(255, 154, 158, 0.4); margin-bottom: 10px; }
         .btn-secondary { background: white; color: #ff758c; border: 1px solid #ff758c; padding: 10px; border-radius: 12px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; }
         .btn-cancel { background: #f0f2f5; color: #999; border: none; padding: 12px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; display: none; }
+        
         .card { background: white; border: 1px solid #ffe4e1; border-radius: 15px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2); cursor: pointer; transition: 0.2s; }
         .card.active { border: 2px solid #ff758c; background: #fff0f5; }
         .card-content { display: flex; align-items: center; gap: 15px; flex: 1; overflow: hidden; }
         .desc-text { font-size: 12px; color: #999; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: normal; }
-        .action-group { display: flex; gap: 5px; }
-        .edit-btn, .delete-btn { font-size: 20px; padding: 5px; cursor: pointer; }
+        
+        /* 🔥 卡片操作區 (聯絡人與主控的鉛筆和垃圾桶) */
+        .action-group { display: flex; gap: 10px; align-items: center; margin-left: 10px; }
+        .edit-btn, .delete-btn { font-size: 20px; padding: 8px; cursor: pointer; background: #fffafa; border-radius: 50%; box-shadow: 0 2px 5px rgba(255, 182, 193, 0.3); transition: transform 0.2s; }
+        .edit-btn:active, .delete-btn:active { transform: scale(0.9); }
+
         .upload-btn { background: white; border: 1px dashed #ff9a9e; color: #ff758c; padding: 12px; border-radius: 12px; text-align: center; cursor: pointer; font-size: 14px; display: block; }
         input[type="file"] { display: none; }
         .previewBox { width: 60px; height: 60px; border-radius: 50%; margin: 10px auto 0; background-size: cover; background-position: center; border: 2px solid #ffc0cb; display: none; justify-content: center; align-items: center; font-size: 24px; }
@@ -214,12 +221,12 @@
     const ADMIN_PASSCODE = "admin123";  
     const USER_PASSCODE = "baby123";    
     
-    // 如果你在畫面上沒有填 Key，系統就會自動吃這裡的預設 Key
+    // 你的 API Key 與模型
     const HIDDEN_API_KEY = "請把你的_API_KEY_貼在這裡"; 
     const HIDDEN_API_URL = "https://openrouter.ai/api/v1/chat/completions";
     const HIDDEN_MODEL = "google/gemini-2.5-pro"; 
 
-    // 🎭 全局預設角色名冊 (已幫你清空，乾乾淨淨！)
+    // 🎭 全局預設角色名冊 
     const SHARED_CHARACTERS = [];
     // ==========================================
 
@@ -243,11 +250,9 @@
     let tempImages = { tempCharImg: "", tempPersonaImg: "" };
 
     window.onload = function() {
-        // 載入管理員設定
         document.getElementById('apiUrl').value = localStorage.getItem('myApiUrl') || HIDDEN_API_URL;
         document.getElementById('apiKey').value = localStorage.getItem('myApiKey') || ''; 
         
-        // 載入儲存的模型列表與選擇的模型
         const savedModels = JSON.parse(localStorage.getItem('cachedModels')) || [];
         const savedSelectedModel = localStorage.getItem('mySelectedModel') || HIDDEN_MODEL;
         populateModelSelect(savedModels, savedSelectedModel);
@@ -272,7 +277,7 @@
         document.getElementById('mainNav').style.display = 'flex'; switchTab('sessions');
     }
 
-    // --- 【全新魔法】一鍵拉取 API 模型列表 ---
+    // --- 一鍵拉取 API 模型 ---
     async function fetchModels() {
         let apiUrl = document.getElementById('apiUrl').value.trim() || HIDDEN_API_URL;
         const apiKey = document.getElementById('apiKey').value.trim() || HIDDEN_API_KEY;
@@ -291,19 +296,12 @@
             if (!response.ok) throw new Error("連線遭拒，請確認網址和 Key 是否正確！");
             const data = await response.json();
             let modelsList = data.data || []; 
-
-            if (modelsList.length === 0) {
-                selectElement.innerHTML = `<option value="${HIDDEN_MODEL}">無法獲取列表，保留預設模型</option>`;
-                alert("連線成功但找不到模型，請確認服務商設定。"); return;
-            }
+            if (modelsList.length === 0) { selectElement.innerHTML = `<option value="${HIDDEN_MODEL}">無法獲取列表，保留預設模型</option>`; return; }
 
             localStorage.setItem('cachedModels', JSON.stringify(modelsList));
             populateModelSelect(modelsList, modelsList[0].id);
             alert(`🎉 連線成功！已為你自動抓取 ${modelsList.length} 個最新模型！`);
-        } catch (error) {
-            selectElement.innerHTML = `<option value="${HIDDEN_MODEL}">拉取失敗，使用預設</option>`;
-            alert("拉取失敗：" + error.message);
-        }
+        } catch (error) { selectElement.innerHTML = `<option value="${HIDDEN_MODEL}">拉取失敗，使用預設</option>`; alert("拉取失敗：" + error.message); }
     }
 
     function populateModelSelect(modelsList, selectedId) {
@@ -316,12 +314,11 @@
         });
     }
 
-    // --- 儲存管理員 API 設定 ---
     function saveAdminSettings() {
         localStorage.setItem('myApiUrl', document.getElementById('apiUrl').value.trim());
         localStorage.setItem('myApiKey', document.getElementById('apiKey').value.trim());
         localStorage.setItem('mySelectedModel', document.getElementById('modelSelect').value);
-        alert('系統設定已儲存！\n(⚠️ 注意：這只會存在這台手機，如果你要分享給別人玩，請把 Key 寫進 GitHub 代碼裡喔)');
+        alert('系統設定已儲存！\n(⚠️ 注意：這只會存在這台手機，分享網址請把 Key 寫進 GitHub 裡)');
     }
 
     // --- UI 切換 ---
@@ -338,7 +335,6 @@
     function autoResize(textarea) { textarea.style.height = 'auto'; textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px'; }
     function handleEnter(event, source) { if (event.shiftKey) return; if (event.key === 'Enter') { const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); if (!isMobile) { event.preventDefault(); processMessage(source); } } }
 
-    // --- 沉浸式通話 ---
     function startCall() { 
         if(!activeSessionId) return; const session = chatSessions.find(s => s.id === activeSessionId); const char = characters.find(c => c.id === session.charId); if(!char) return;
         const bigAvatar = document.getElementById('callBigAvatar');
@@ -350,7 +346,6 @@
     }
     function endCall() { clearInterval(callTimerInterval); switchTab('chat'); setTimeout(() => document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight, 100); }
 
-    // --- 圖片 ---
     function processImage(event, previewId, tempVarName) {
         const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
         reader.onload = function(e) { const img = new Image(); img.src = e.target.result; img.onload = function() { const canvas = document.createElement('canvas'); let w = img.width, h = img.height; if (w > h) { if (w > 150) { h *= 150 / w; w = 150; } } else { if (h > 150) { w *= 150 / h; h = 150; } } canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h); tempImages[tempVarName] = canvas.toDataURL('image/jpeg', 0.8); const box = document.getElementById(previewId); box.style.backgroundImage = `url(${tempImages[tempVarName]})`; box.style.display = 'flex'; box.innerText = ''; } }; reader.readAsDataURL(file);
@@ -378,16 +373,39 @@
     // --- 角色 (Character) ---
     function renderCharacterList() {
         const listDiv = document.getElementById('charList'); listDiv.innerHTML = '';
-        if(characters.length === 0) { listDiv.innerHTML = currentUserRole === 'admin' ? '<div style="text-align:center; color:#ffb7b2; padding-top:20px;">空空的...去「新增」建立角色吧！</div>' : '<div style="text-align:center; color:#ffb7b2; padding-top:20px;">管理員還沒建立角色喔！</div>'; return; }
+        if(characters.length === 0) { listDiv.innerHTML = currentUserRole === 'admin' ? '<div style="text-align:center; color:#ffb7b2; padding-top:20px;">空空的...去「➕ 新增」建立角色吧！</div>' : '<div style="text-align:center; color:#ffb7b2; padding-top:20px;">管理員還沒建立角色喔！</div>'; return; }
+        
         characters.forEach(char => { 
-            const card = document.createElement('div'); card.className = `card`; const contentDiv = document.createElement('div'); contentDiv.className = 'card-content'; contentDiv.onclick = () => createNewSession(char.id); contentDiv.innerHTML = `${getAvatarHtml(char.avatar)}<div style="flex:1;"><div style="font-weight:bold; color:#ff758c;">${char.name}</div><div class="desc-text">點擊創建聊天</div></div>`; card.appendChild(contentDiv);
+            const card = document.createElement('div'); card.className = `card`; 
+            const contentDiv = document.createElement('div'); contentDiv.className = 'card-content'; contentDiv.onclick = () => createNewSession(char.id); 
+            contentDiv.innerHTML = `${getAvatarHtml(char.avatar)}<div style="flex:1;"><div style="font-weight:bold; color:#ff758c;">${char.name}</div><div class="desc-text">點擊創建聊天</div></div>`; 
+            card.appendChild(contentDiv);
+            
+            // 🔥 確認是管理員才渲染出角色的鉛筆與垃圾桶！
             if(currentUserRole === 'admin') { 
-                const actGroup = document.createElement('div'); actGroup.className = 'action-group';
-                const editBtn = document.createElement('div'); editBtn.className = 'edit-btn'; editBtn.innerHTML = '✏️'; editBtn.onclick = (e) => { e.stopPropagation(); editCharMode(char.id); }; actGroup.appendChild(editBtn);
-                const delBtn = document.createElement('div'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '🗑️'; delBtn.onclick = (e) => { e.stopPropagation(); if(confirm("確定刪除角色？")) { characters = characters.filter(c => c.id !== char.id); localStorage.setItem('myCharacters', JSON.stringify(characters)); renderCharacterList(); } }; actGroup.appendChild(delBtn); card.appendChild(actGroup); 
-            } listDiv.appendChild(card); 
+                const actGroup = document.createElement('div'); 
+                actGroup.className = 'action-group';
+                
+                // 角色的編輯鉛筆
+                const editBtn = document.createElement('div'); 
+                editBtn.className = 'edit-btn'; 
+                editBtn.innerHTML = '✏️'; 
+                editBtn.onclick = (e) => { e.stopPropagation(); editCharMode(char.id); }; 
+                actGroup.appendChild(editBtn);
+                
+                // 角色的刪除垃圾桶
+                const delBtn = document.createElement('div'); 
+                delBtn.className = 'delete-btn'; 
+                delBtn.innerHTML = '🗑️'; 
+                delBtn.onclick = (e) => { e.stopPropagation(); if(confirm("確定刪除角色？")) { characters = characters.filter(c => c.id !== char.id); localStorage.setItem('myCharacters', JSON.stringify(characters)); renderCharacterList(); } }; 
+                actGroup.appendChild(delBtn); 
+                
+                card.appendChild(actGroup); 
+            } 
+            listDiv.appendChild(card); 
         });
     }
+
     function editCharMode(id) { const char = characters.find(c => c.id === id); if(!char) return; editingCharId = id; document.getElementById('newCharName').value = char.name; document.getElementById('newCharGreeting').value = char.greeting; document.getElementById('newCharPrompt').value = char.prompt; const preview = document.getElementById('previewCharAvatar'); if(char.avatar.startsWith('data:image')) { tempImages.tempCharImg = char.avatar; preview.style.backgroundImage = `url(${char.avatar})`; preview.style.display = 'flex'; preview.innerText = ''; } else { tempImages.tempCharImg = char.avatar; preview.style.backgroundImage = 'none'; preview.style.display = 'flex'; preview.innerText = char.avatar; } document.getElementById('createViewTitle').innerText = '✏️ 編輯角色'; document.getElementById('navCreateText').innerText = '編輯中'; document.getElementById('btnSubmitChar').innerText = '💾 儲存角色修改'; document.getElementById('btnCancelChar').style.display = 'block'; switchTab('create'); }
     function cancelEditChar() { editingCharId = null; document.getElementById('newCharName').value = ''; document.getElementById('newCharPrompt').value = ''; document.getElementById('newCharGreeting').value = ''; document.getElementById('previewCharAvatar').style.display = 'none'; tempImages.tempCharImg = ""; document.getElementById('createViewTitle').innerText = '✨ 創造新角色'; document.getElementById('navCreateText').innerText = '新增'; document.getElementById('btnSubmitChar').innerText = '＋ 完成並建立角色'; document.getElementById('btnCancelChar').style.display = 'none'; }
     function submitCharacter() { const name = document.getElementById('newCharName').value.trim(); const prompt = document.getElementById('newCharPrompt').value.trim(); if(!name || !prompt) { alert('名字跟設定都要填寫！'); return; } const greeting = document.getElementById('newCharGreeting').value.trim() || '你好！'; const avatarData = tempImages.tempCharImg || '✨';
@@ -416,6 +434,8 @@
             let avatarStyle = ''; let avatarChar = ''; 
             const targetAvatar = msg.role === 'user' ? persona.avatar : char.avatar; 
             if (targetAvatar && targetAvatar.startsWith('data:image')) avatarStyle = `background-image: url(${targetAvatar}); background-color: transparent;`; else avatarChar = targetAvatar || (msg.role === 'user' ? '🎭' : '✨'); 
+            
+            // 🔥 氣泡與編輯鉛筆渲染區塊
             row.innerHTML = `
                 <div class="msg-avatar" style="${avatarStyle}">${avatarChar}</div>
                 <div class="message-bubble-wrap ${msg.role === 'user' ? 'user-wrap' : 'ai-wrap'}">
@@ -483,4 +503,3 @@
 
 </body>
 </html>
-
